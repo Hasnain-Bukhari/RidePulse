@@ -6,27 +6,27 @@
 //
 
 import SwiftUI
-import SwiftData
-
 @main
 struct RidePulseApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    private let environment = AppEnvironment.live()
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @State private var permissions = AppPermissions()
+    @Environment(\.scenePhase) private var scenePhase
+    #endif
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .environment(\.appEnvironment, environment)
+                #if os(iOS)
+                .task {
+                    await permissions.activate()
+                }
+                .onChange(of: scenePhase) { phase in
+                    permissions.handleScenePhase(phase)
+                }
+                #endif
         }
-        .modelContainer(sharedModelContainer)
     }
 }
