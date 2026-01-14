@@ -37,7 +37,7 @@ actor WebSocketClient {
     func connect(onEvent: @escaping (Event) -> Void) {
         self.onEvent = onEvent
         shouldReconnect = true
-        start()
+        Task { await self.start() }
     }
 
     func send(text: String) async {
@@ -65,12 +65,12 @@ actor WebSocketClient {
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
         state = .disconnected
-        onEvent?(.disconnected)
+        await emit(.disconnected)
     }
 
     // MARK: - Private
 
-    private func start() {
+    private func start() async {
         guard shouldReconnect, state != .connecting else { return }
         listenTask?.cancel()
         pingTask?.cancel()
@@ -80,40 +80,59 @@ actor WebSocketClient {
         task.resume()
         listen(task: task)
         startPing(task: task)
-        onEvent?(.connected)
+        await emit(.connected)
     }
 
     private func listen(task: URLSessionWebSocketTask) {
         listenTask = Task { [weak self] in
-            guard let self else { return }
-            while !Task.isCancelled {
-                do {
-                    let message = try await task.receive()
-                    await self.resetBackoff()
-                    switch message {
-                    case .data(let data):
-                        self.onEvent?(.message(data))
-                    case .string(let text):
-                        self.onEvent?(.text(text))
-                    @unknown default:
-                        break
-                    }
-                } catch {
-                    if Task.isCancelled { break }
-                    await self.handleFailure(error)
+            await self?.listenLoop(task: task)
+        }
+    }
+
+    private func listenLoop(task: URLSessionWebSocketTask) async {
+        while !Task.isCancelled {
+            do {
+                let message = try await task.receive()
+                await resetBackoff()
+                switch message {
+                case .data(let data):
+                    await emit(.message(data))
+                case .string(let text):
+                    await emit(.text(text))
+                @unknown default:
                     break
                 }
+            } catch {
+                if Task.isCancelled { break }
+                await handleFailure(error)
+                break
             }
         }
     }
 
     private func startPing(task: URLSessionWebSocketTask) {
         pingTask = Task { [weak self] in
-            guard let self else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: UInt64(pingInterval * 1_000_000_000))
-                guard self.state == .connected else { continue }
-                try? await task.sendPing()
+            await self?.pingLoop(task: task)
+        }
+    }
+
+    private func pingLoop(task: URLSessionWebSocketTask) async {
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: UInt64(pingInterval * 1_000_000_000))
+            guard isConnected() else { continue }
+            do {
+                try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                    task.sendPing { error in
+                        if let error {
+                            cont.resume(throwing: error)
+                        } else {
+                            cont.resume()
+                        }
+                    }
+                }
+            } catch {
+                await handleFailure(error)
+                break
             }
         }
     }
@@ -126,17 +145,29 @@ actor WebSocketClient {
         let jitter = Double.random(in: 0.8...1.2)
         let delay = base * jitter
         try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-        start()
+        await start()
     }
 
-    private func resetBackoff() {
+    private func resetBackoff() async {
         retryAttempts = 0
         state = .connected
     }
 
+    private func isConnected() -> Bool {
+        if case .connected = state {
+            return true
+        }
+        return false
+    }
+
     private func handleFailure(_ error: Error) async {
-        onEvent?(.error(error))
+        await emit(.error(error))
         await scheduleReconnect()
+    }
+
+    @inline(__always)
+    private func emit(_ event: Event) async {
+        onEvent?(event)
     }
 }
 

@@ -9,6 +9,10 @@ SwiftUI iOS rider/driver realtime communication app with a lightweight Node.js W
 - Always-on location and background audio support with AVAudioSession configuration.
 - Permissions manager for mic + location and lifecycle handling.
 - Node.js TypeScript WebSocket server with room-based presence, leader assignment, heartbeat/pong, chat broadcast.
+- WebRTC scaffolding for future group voice (audio-only manager + signaling messages).
+- Live location protocol and relay (WebSocket location messages) plus multi-rider map rendering with animated markers.
+- Route planning scaffold: route model/UI, Google Maps preview, WebSocket route sharing, leader-only edits/transfer support on the backend.
+- Basic stability UX: chat shows connection errors with retry; WebSocket client auto-reconnects with jittered backoff and ping.
 
 ## Repo layout
 - `RidePulse/` — iOS app
@@ -45,6 +49,16 @@ Features:
 - Use `WebSocketClient` at `RidePulse/Core/Networking/WebSocketClient.swift`.
 - Point to your server URL, e.g. on device: `ws://<your_machine_ip>:8080`.
 - Client auto-reconnects with jittered backoff, pings every 15s, and surfaces events: `.connected`, `.disconnected`, `.text`, `.message`, `.error`.
+- WebRTC signaling (offer/answer/ICE) messages are relayed via the backend; hook them up with `WebRTCAudioManager` when the WebRTC SDK is added.
+- Live location: use `LiveLocationProtocol` to encode/decode location updates; map to `RiderLocation` and render with `LiveRidersMapView`.
+- Routes: use `RouteShareProtocol` to send/receive route updates; `RoutePlannerView` provides the UI; backend relays `route-set` and leader transfer.
+
+## Stability & Testing notes
+- Error/reconnect UX: chat view surfaces connection failures with retry. WebSocket client pings every 15s and retries with exponential backoff + jitter.
+- Network edge cases: expect brief drops to reconnect automatically; if fully offline (airplane mode), retry button is shown.
+- Battery: location throttled (~5s), background audio session configured; adjust GPS accuracy and intervals for longer rides as needed.
+- Long-ride test (2h): run on device with screen off; verify chat reconnects, location updates keep flowing, and audio remains active after interruptions.
+- Pre-release sanity: check permissions prompts, Maps API key, WebSocket endpoints, and background modes before TestFlight.
 
 ## Background behaviors
 - Audio: `AudioSessionConfig` sets `.playAndRecord`, ducks/pauses others, keeps session active on scene changes.
@@ -64,4 +78,5 @@ Features:
 ## Notes
 - Update Info.plist strings and API key before distributing.
 - For App Store, include user-facing explanation for background location usage.
+
 

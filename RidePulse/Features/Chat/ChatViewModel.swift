@@ -49,6 +49,13 @@ final class ChatViewModel: ObservableObject {
         messagingService.disconnect(channelID: ride.channelID)
     }
 
+    func reconnect() {
+        streamTask?.cancel()
+        streamTask = nil
+        connectionState = .connecting
+        startStreaming()
+    }
+
     func sendMessage() {
         let trimmed = composerText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }

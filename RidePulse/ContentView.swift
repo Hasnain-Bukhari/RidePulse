@@ -27,6 +27,16 @@ struct RootView: View {
             .tabItem {
                 Label("Chat", systemImage: "bubble.left.and.bubble.right.fill")
             }
+
+#if os(iOS)
+            RoutePlannerView(
+                viewModel: RoutePlannerViewModel(plan: RoutePlan.sample()),
+                roomId: ride.channelID
+            )
+            .tabItem {
+                Label("Route", systemImage: "point.topleft.down.curvedto.point.bottomright.up")
+            }
+#endif
         }
     }
 }

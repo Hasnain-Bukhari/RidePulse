@@ -5,6 +5,10 @@ import Combine
 @MainActor
 final class RideDashboardViewModel: ObservableObject {
     @Published var ride: Ride
+    @Published var liveRiders: [RiderLocation] = [
+        RiderLocation.sample(riderId: "you", lat: 37.3349, lng: -122.0090),
+        RiderLocation.sample(riderId: "driver", lat: 37.3355, lng: -122.0105)
+    ]
 
     init(ride: Ride) {
         self.ride = ride

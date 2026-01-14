@@ -7,6 +7,9 @@ struct ChatView: View {
     var body: some View {
         VStack(spacing: AppTheme.spacing) {
             header
+            if case .failed(let message) = viewModel.connectionState {
+                errorBanner(message: message)
+            }
             Divider()
             messages
             composer
@@ -100,6 +103,25 @@ struct ChatView: View {
         if trimmed.isEmpty { return true }
         if case .failed = viewModel.connectionState { return true }
         return false
+    }
+
+    private func errorBanner(message: String) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Connection Issue")
+                    .font(.subheadline).bold()
+                Text(message)
+                    .font(.caption)
+            }
+            Spacer()
+            Button("Retry") {
+                viewModel.reconnect()
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(10)
+        .background(Color.red.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
 

@@ -7,7 +7,7 @@ struct RideDashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppTheme.spacing) {
                 #if os(iOS)
-                UserLocationMapView()
+                LiveRidersMapView(riders: $viewModel.liveRiders)
                 #endif
                 rideCard
                 statusCard
